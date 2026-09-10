@@ -13,20 +13,6 @@ if not TOKEN:
 bot = telebot.TeleBot(TOKEN)
 app = Flask(__name__)
 
-# ---------------- WEB ----------------
-
-@app.route("/")
-def home():
-    return "Kaif Shaurma bot is running!"
-
-
-def run_web():
-    port = int(os.environ.get("PORT", 10000))
-    app.run(host="0.0.0.0", port=port)
-
-
-# ---------------- ДАННЫЕ ----------------
-
 carts = {}
 order_states = {}
 
@@ -54,6 +40,12 @@ ADDITIONS = [
     "Сыр твёрдый",
     "Фри",
     "Халапеньо",
+]
+
+COFFEES = [
+    "Американо 200 мл",
+    "Капучино 200 мл",
+    "Латте 200 мл",
 ]
 
 MENU = {
@@ -101,7 +93,15 @@ MENU = {
 }
 
 
-# ---------------- КЛАВИАТУРЫ ----------------
+@app.route("/")
+def home():
+    return "Kaif Shaurma bot is running!"
+
+
+def run_web():
+    port = int(os.environ.get("PORT", 10000))
+    app.run(host="0.0.0.0", port=port)
+
 
 def main_keyboard():
     kb = types.ReplyKeyboardMarkup(resize_keyboard=True)
@@ -166,26 +166,23 @@ def shawarma_keyboard():
     return kb
 
 
-# ---------------- ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ----------------
-
 def get_cart(user_id):
     if user_id not in carts:
         carts[user_id] = []
+
     return carts[user_id]
+
+
+def add_to_cart(user_id, name, price, details=None):
+    get_cart(user_id).append({
+        "name": name,
+        "price": price,
+        "details": details or []
+    })
 
 
 def cart_total(user_id):
     return sum(item["price"] for item in get_cart(user_id))
-
-
-def add_to_cart(user_id, name, price, details=None):
-    item = {
-        "name": name,
-        "price": price,
-        "details": details or []
-    }
-
-    get_cart(user_id).append(item)
 
 
 def format_cart(user_id):
@@ -210,7 +207,9 @@ def format_cart(user_id):
 def send_category(chat_id, category):
     kb = types.InlineKeyboardMarkup()
 
-    for index, (name, price) in enumerate(MENU[category]):
+    for index, item in enumerate(MENU[category]):
+        name, price = item
+
         kb.add(
             types.InlineKeyboardButton(
                 f"{name} — {price} ₽",
@@ -225,21 +224,17 @@ def send_category(chat_id, category):
     )
 
 
-# ---------------- START ----------------
-
 @bot.message_handler(commands=["start"])
 def start(message):
     bot.send_message(
         message.chat.id,
         "🌯 Добро пожаловать в «Кайф Шаурма»!\n\n"
         "Здесь можно посмотреть меню и оформить заказ.\n\n"
-        "📍 Сейчас бот принимает заказы только на САМОВЫВОЗ.\n"
+        "📍 Сейчас бот принимает заказы только на самовывоз.\n"
         "💳 Онлайн-оплаты пока нет — оплата при получении.",
         reply_markup=main_keyboard()
     )
 
-
-# ---------------- ГЛАВНОЕ МЕНЮ ----------------
 
 @bot.message_handler(func=lambda m: m.text == "🌯 Меню")
 def show_menu(message):
@@ -263,8 +258,6 @@ def main_back(message):
 def menu_back(message):
     show_menu(message)
 
-
-# ---------------- ШАУРМА ----------------
 
 @bot.message_handler(func=lambda m: m.text == "🌯 Шаурма")
 def shawarma(message):
@@ -290,8 +283,6 @@ def shawarma_vegan(message):
     send_category(message.chat.id, "shawarma_vegan")
 
 
-# ---------------- ОСТАЛЬНЫЕ КАТЕГОРИИ ----------------
-
 @bot.message_handler(func=lambda m: m.text == "🥙 Донеры")
 def doner(message):
     send_category(message.chat.id, "doner")
@@ -308,7 +299,7 @@ def sandwich(message):
 
 
 @bot.message_handler(func=lambda m: m.text == "🍔 Бургеры")
-def burgers(message):
+def burger(message):
     send_category(message.chat.id, "burger")
 
 
@@ -317,8 +308,6 @@ def shashlik(message):
     send_category(message.chat.id, "shashlik")
 
 
-# ---------------- ОБЫЧНЫЕ ПОЗИЦИИ ----------------
-
 @bot.callback_query_handler(func=lambda call: call.data.startswith("item|"))
 def choose_item(call):
     _, category, index = call.data.split("|")
@@ -326,12 +315,12 @@ def choose_item(call):
 
     name, price = MENU[category][index]
 
-    # Для шаурмы после выбора предлагаем добавки
     if category.startswith("shawarma"):
         order_states[call.from_user.id] = {
             "type": "shawarma",
             "name": name,
-            "price": price,
+            "base_price": price,
+            "extras_total": 0,
             "details": []
         }
 
@@ -351,12 +340,11 @@ def choose_item(call):
 
         bot.send_message(
             call.message.chat.id,
-            f"✅ {name} добавлено в корзину.\n\n"
-            f"💰 {price} ₽"
+            f"✅ {name} добавлено в корзину.\n"
+            f"💰 Цена: {price} ₽\n\n"
+            f"🛒 Общая сумма корзины: {cart_total(call.from_user.id)} ₽"
         )
 
-
-# ---------------- ДОБАВКИ К ШАУРМЕ ----------------
 
 def show_shawarma_extras(chat_id):
     kb = types.InlineKeyboardMarkup()
@@ -385,7 +373,7 @@ def show_shawarma_extras(chat_id):
 
     bot.send_message(
         chat_id,
-        "Хотите добавить что-нибудь в шаурму?\n\n"
+        "Хотите добавить что-нибудь?\n\n"
         "Можно выбрать несколько добавок.",
         reply_markup=kb
     )
@@ -401,14 +389,25 @@ def shawarma_addition(call):
     index = int(call.data.split("|")[1])
     addition = ADDITIONS[index]
 
-    order_states[user_id]["price"] += 60
+    order_states[user_id]["extras_total"] += 60
     order_states[user_id]["details"].append(
         f"Добавка: {addition} (+60 ₽)"
+    )
+
+    current_total = (
+        order_states[user_id]["base_price"]
+        + order_states[user_id]["extras_total"]
     )
 
     bot.answer_callback_query(
         call.id,
         f"{addition} добавлено ✅"
+    )
+
+    bot.send_message(
+        call.message.chat.id,
+        f"➕ {addition}: +60 ₽\n"
+        f"💰 Текущая стоимость позиции: {current_total} ₽"
     )
 
 
@@ -426,7 +425,7 @@ def shawarma_sauce(call):
 
     bot.send_message(
         call.message.chat.id,
-        "Выберите дополнительный соус:",
+        "Выберите соус:",
         reply_markup=kb
     )
 
@@ -436,21 +435,32 @@ def shawarma_sauce(call):
 )
 def shawarma_sauce_select(call):
     user_id = call.from_user.id
-    index = int(call.data.split("|")[1])
-
-    sauce = SAUCES[index]
 
     if user_id not in order_states:
         return
 
-    order_states[user_id]["price"] += 60
+    index = int(call.data.split("|")[1])
+    sauce = SAUCES[index]
+
+    order_states[user_id]["extras_total"] += 60
     order_states[user_id]["details"].append(
         f"Соус: {sauce} (+60 ₽)"
+    )
+
+    current_total = (
+        order_states[user_id]["base_price"]
+        + order_states[user_id]["extras_total"]
     )
 
     bot.answer_callback_query(
         call.id,
         "Соус добавлен ✅"
+    )
+
+    bot.send_message(
+        call.message.chat.id,
+        f"🥫 {sauce}: +60 ₽\n"
+        f"💰 Текущая стоимость позиции: {current_total} ₽"
     )
 
 
@@ -463,21 +473,26 @@ def shawarma_done(call):
 
     item = order_states.pop(user_id)
 
+    final_price = (
+        item["base_price"]
+        + item["extras_total"]
+    )
+
     add_to_cart(
         user_id,
         item["name"],
-        item["price"],
+        final_price,
         item["details"]
     )
 
     bot.send_message(
         call.message.chat.id,
-        f"✅ Шаурма добавлена в корзину.\n"
-        f"Стоимость: {item['price']} ₽"
+        f"✅ Шаурма добавлена в корзину.\n\n"
+        f"🌯 {item['name']}\n"
+        f"💰 Цена позиции с добавками: {final_price} ₽\n"
+        f"🛒 Общая сумма корзины: {cart_total(user_id)} ₽"
     )
 
-
-# ---------------- КОМБО ----------------
 
 @bot.message_handler(func=lambda m: m.text == "🍱 Комбо-наборы")
 def combo(message):
@@ -518,9 +533,7 @@ def combo(message):
 def combo1(call):
     kb = types.InlineKeyboardMarkup()
 
-    coffees = ["Американо 200 мл", "Капучино 200 мл", "Латте 200 мл"]
-
-    for index, coffee in enumerate(coffees):
+    for index, coffee in enumerate(COFFEES):
         kb.add(
             types.InlineKeyboardButton(
                 coffee,
@@ -530,17 +543,15 @@ def combo1(call):
 
     bot.send_message(
         call.message.chat.id,
-        "☕ Выберите кофе к комбо:",
+        "☕ Выберите кофе:",
         reply_markup=kb
     )
 
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith("coffee|"))
 def coffee_select(call):
-    coffees = ["Американо 200 мл", "Капучино 200 мл", "Латте 200 мл"]
-
     index = int(call.data.split("|")[1])
-    coffee = coffees[index]
+    coffee = COFFEES[index]
 
     add_to_cart(
         call.from_user.id,
@@ -554,18 +565,20 @@ def coffee_select(call):
 
     bot.send_message(
         call.message.chat.id,
-        f"✅ Комбо №1 добавлено.\n☕ Кофе: {coffee}"
+        f"✅ Комбо №1 добавлено.\n"
+        f"☕ {coffee}\n"
+        f"🛒 Общая сумма: {cart_total(call.from_user.id)} ₽"
     )
 
 
-def show_free_sauces(chat_id, combo_number):
+def show_free_sauces(chat_id, kind):
     kb = types.InlineKeyboardMarkup()
 
     for index, sauce in enumerate(SAUCES):
         kb.add(
             types.InlineKeyboardButton(
                 sauce,
-                callback_data=f"free_sauce|{combo_number}|{index}"
+                callback_data=f"free_sauce|{kind}|{index}"
             )
         )
 
@@ -578,12 +591,18 @@ def show_free_sauces(chat_id, combo_number):
 
 @bot.callback_query_handler(func=lambda call: call.data == "combo2")
 def combo2(call):
-    show_free_sauces(call.message.chat.id, "combo2")
+    show_free_sauces(
+        call.message.chat.id,
+        "combo2"
+    )
 
 
 @bot.callback_query_handler(func=lambda call: call.data == "combo3")
 def combo3(call):
-    show_free_sauces(call.message.chat.id, "combo3")
+    show_free_sauces(
+        call.message.chat.id,
+        "combo3"
+    )
 
 
 @bot.callback_query_handler(
@@ -594,113 +613,77 @@ def free_sauce_select(call):
     sauce = SAUCES[int(index)]
 
     if kind == "combo2":
-        add_to_cart(
-            call.from_user.id,
-            "Комбо №2",
-            470,
-            [
-                "Шаурма с курицей стандарт",
-                "Картофель фри 100 г",
-                f"Соус: {sauce}"
-            ]
-        )
+        name = "Комбо №2"
+        price = 470
+        details = [
+            "Шаурма с курицей стандарт",
+            "Картофель фри 100 г",
+            f"Соус: {sauce}"
+        ]
 
     elif kind == "combo3":
-        add_to_cart(
-            call.from_user.id,
-            "Комбо №3",
-            520,
-            [
-                "Чикен-бургер",
-                "Картофель фри 100 г",
-                f"Соус: {sauce}"
-            ]
-        )
+        name = "Комбо №3"
+        price = 520
+        details = [
+            "Чикен-бургер",
+            "Картофель фри 100 г",
+            f"Соус: {sauce}"
+        ]
 
     elif kind == "country200":
-        add_to_cart(
-            call.from_user.id,
-            "Картофель по-деревенски 200 г + соус 30 г",
-            270,
-            [f"Соус: {sauce}"]
-        )
+        name = "Картофель по-деревенски 200 г + соус 30 г"
+        price = 270
+        details = [f"Соус: {sauce}"]
 
     elif kind == "fries200":
-        add_to_cart(
-            call.from_user.id,
-            "Картофель фри 200 г + соус 30 г",
-            260,
-            [f"Соус: {sauce}"]
-        )
+        name = "Картофель фри 200 г + соус 30 г"
+        price = 260
+        details = [f"Соус: {sauce}"]
 
     elif kind == "cheese":
-        add_to_cart(
-            call.from_user.id,
-            "Сырные палочки 6 шт.",
-            335,
-            [f"Соус: {sauce}"]
-        )
+        name = "Сырные палочки 6 шт. + соус"
+        price = 335
+        details = [f"Соус: {sauce}"]
+
+    else:
+        return
+
+    add_to_cart(
+        call.from_user.id,
+        name,
+        price,
+        details
+    )
 
     bot.send_message(
         call.message.chat.id,
-        f"✅ Добавлено в корзину.\n🥫 Соус: {sauce}"
+        f"✅ Добавлено в корзину.\n"
+        f"🥫 Соус: {sauce}\n"
+        f"🛒 Общая сумма: {cart_total(call.from_user.id)} ₽"
     )
 
-
-# ---------------- СНЭКИ ----------------
 
 @bot.message_handler(func=lambda m: m.text == "🍟 Снэки")
 def snacks(message):
     kb = types.InlineKeyboardMarkup()
 
-    kb.add(
-        types.InlineKeyboardButton(
-            "Картофель по-деревенски 100 г — 190 ₽",
-            callback_data="snack_country100"
-        )
-    )
+    snacks_list = [
+        ("Картофель по-деревенски 100 г — 190 ₽", "snack_country100"),
+        ("Картофель по-деревенски 200 г + соус — 270 ₽", "snack_country200"),
+        ("Картофель фри 100 г — 180 ₽", "snack_fries100"),
+        ("Картофель фри 200 г + соус — 260 ₽", "snack_fries200"),
+        ("Наггетсы 4 шт. + фри 100 г — 260 ₽", "snack_nuggets4"),
+        ("Наггетсы 6 шт. — 260 ₽", "snack_nuggets6"),
+        ("Сырные палочки 6 шт. + соус — 335 ₽", "snack_cheese"),
+    ]
 
-    kb.add(
-        types.InlineKeyboardButton(
-            "Картофель по-деревенски 200 г + соус — 270 ₽",
-            callback_data="snack_country200"
+    for text, callback in snacks_list:
+        kb.add(
+            types.InlineKeyboardButton(
+                text,
+                callback_data=callback
+            )
         )
-    )
-
-    kb.add(
-        types.InlineKeyboardButton(
-            "Картофель фри 100 г — 180 ₽",
-            callback_data="snack_fries100"
-        )
-    )
-
-    kb.add(
-        types.InlineKeyboardButton(
-            "Картофель фри 200 г + соус — 260 ₽",
-            callback_data="snack_fries200"
-        )
-    )
-
-    kb.add(
-        types.InlineKeyboardButton(
-            "Наггетсы 4 шт. + фри 100 г — 260 ₽",
-            callback_data="snack_nuggets4"
-        )
-    )
-
-    kb.add(
-        types.InlineKeyboardButton(
-            "Наггетсы 6 шт. — 260 ₽",
-            callback_data="snack_nuggets6"
-        )
-    )
-
-    kb.add(
-        types.InlineKeyboardButton(
-            "Сырные палочки 6 шт. + соус — 335 ₽",
-            callback_data="snack_cheese"
-        )
-    )
 
     bot.send_message(
         message.chat.id,
@@ -716,12 +699,20 @@ def snack_country100(call):
         "Картофель по-деревенски 100 г",
         190
     )
-    bot.send_message(call.message.chat.id, "✅ Добавлено в корзину.")
+
+    bot.send_message(
+        call.message.chat.id,
+        f"✅ Добавлено.\n"
+        f"🛒 Общая сумма: {cart_total(call.from_user.id)} ₽"
+    )
 
 
 @bot.callback_query_handler(func=lambda call: call.data == "snack_country200")
 def snack_country200(call):
-    show_free_sauces(call.message.chat.id, "country200")
+    show_free_sauces(
+        call.message.chat.id,
+        "country200"
+    )
 
 
 @bot.callback_query_handler(func=lambda call: call.data == "snack_fries100")
@@ -731,12 +722,20 @@ def snack_fries100(call):
         "Картофель фри 100 г",
         180
     )
-    bot.send_message(call.message.chat.id, "✅ Добавлено в корзину.")
+
+    bot.send_message(
+        call.message.chat.id,
+        f"✅ Добавлено.\n"
+        f"🛒 Общая сумма: {cart_total(call.from_user.id)} ₽"
+    )
 
 
 @bot.callback_query_handler(func=lambda call: call.data == "snack_fries200")
 def snack_fries200(call):
-    show_free_sauces(call.message.chat.id, "fries200")
+    show_free_sauces(
+        call.message.chat.id,
+        "fries200"
+    )
 
 
 @bot.callback_query_handler(func=lambda call: call.data == "snack_nuggets4")
@@ -746,7 +745,12 @@ def snack_nuggets4(call):
         "Наггетсы 4 шт. + картофель фри 100 г",
         260
     )
-    bot.send_message(call.message.chat.id, "✅ Добавлено в корзину.")
+
+    bot.send_message(
+        call.message.chat.id,
+        f"✅ Добавлено.\n"
+        f"🛒 Общая сумма: {cart_total(call.from_user.id)} ₽"
+    )
 
 
 @bot.callback_query_handler(func=lambda call: call.data == "snack_nuggets6")
@@ -756,15 +760,21 @@ def snack_nuggets6(call):
         "Наггетсы 6 шт.",
         260
     )
-    bot.send_message(call.message.chat.id, "✅ Добавлено в корзину.")
+
+    bot.send_message(
+        call.message.chat.id,
+        f"✅ Добавлено.\n"
+        f"🛒 Общая сумма: {cart_total(call.from_user.id)} ₽"
+    )
 
 
 @bot.callback_query_handler(func=lambda call: call.data == "snack_cheese")
 def snack_cheese(call):
-    show_free_sauces(call.message.chat.id, "cheese")
+    show_free_sauces(
+        call.message.chat.id,
+        "cheese"
+    )
 
-
-# ---------------- ОТДЕЛЬНЫЙ РАЗДЕЛ ДОБАВКИ ----------------
 
 @bot.message_handler(func=lambda m: m.text == "➕ Добавки")
 def additions_menu(message):
@@ -804,12 +814,19 @@ def extra_add(call):
         60
     )
 
-    bot.answer_callback_query(call.id, "Добавлено ✅")
+    bot.answer_callback_query(
+        call.id,
+        "Добавлено ✅"
+    )
+
+    bot.send_message(
+        call.message.chat.id,
+        f"➕ {addition} добавлено.\n"
+        f"🛒 Общая сумма: {cart_total(call.from_user.id)} ₽"
+    )
 
 
-@bot.callback_query_handler(
-    func=lambda call: call.data.startswith("extra_sauce|")
-)
+@bot.callback_query_handler(func=lambda call: call.data.startswith("extra_sauce|"))
 def extra_sauce(call):
     index = int(call.data.split("|")[1])
     sauce = SAUCES[index]
@@ -820,10 +837,17 @@ def extra_sauce(call):
         60
     )
 
-    bot.answer_callback_query(call.id, "Добавлено ✅")
+    bot.answer_callback_query(
+        call.id,
+        "Добавлено ✅"
+    )
 
+    bot.send_message(
+        call.message.chat.id,
+        f"🥫 {sauce} добавлен.\n"
+        f"🛒 Общая сумма: {cart_total(call.from_user.id)} ₽"
+    )
 
-# ---------------- КОРЗИНА ----------------
 
 @bot.message_handler(func=lambda m: m.text == "🛒 Корзина")
 def show_cart(message):
@@ -869,8 +893,6 @@ def clear_cart(call):
     )
 
 
-# ---------------- ОФОРМЛЕНИЕ ----------------
-
 @bot.callback_query_handler(func=lambda call: call.data == "checkout")
 def checkout(call):
     user_id = call.from_user.id
@@ -891,7 +913,10 @@ def checkout(call):
         "👤 Как вас зовут?"
     )
 
-    bot.register_next_step_handler(msg, get_customer_name)
+    bot.register_next_step_handler(
+        msg,
+        get_customer_name
+    )
 
 
 def get_customer_name(message):
@@ -904,7 +929,10 @@ def get_customer_name(message):
         "☎️ Напишите номер телефона для связи:"
     )
 
-    bot.register_next_step_handler(msg, get_customer_phone)
+    bot.register_next_step_handler(
+        msg,
+        get_customer_phone
+    )
 
 
 def get_customer_phone(message):
@@ -918,7 +946,10 @@ def get_customer_phone(message):
         "Например: через 20 минут или в 21:30."
     )
 
-    bot.register_next_step_handler(msg, get_pickup_time)
+    bot.register_next_step_handler(
+        msg,
+        get_pickup_time
+    )
 
 
 def get_pickup_time(message):
@@ -970,6 +1001,8 @@ def confirm_order(call):
 
     data = order_states[user_id]
 
+    total = cart_total(user_id)
+
     admin_text = (
         "🔥 НОВЫЙ ЗАКАЗ — КАЙФ ШАУРМА\n\n"
         f"{format_cart(user_id)}\n\n"
@@ -987,13 +1020,16 @@ def confirm_order(call):
                 admin_text
             )
         except Exception as error:
-            print("Ошибка отправки админу:", error)
+            print(
+                "Ошибка отправки админу:",
+                error
+            )
 
     bot.edit_message_text(
         "✅ Заказ принят!\n\n"
         "Спасибо за заказ ❤️\n"
         "Мы получили вашу заявку.\n\n"
-        f"💰 Сумма: {cart_total(user_id)} ₽\n"
+        f"💰 Итоговая сумма: {total} ₽\n"
         f"⏰ Самовывоз: {data.get('pickup')}\n\n"
         "Оплата производится при получении.",
         call.message.chat.id,
@@ -1001,12 +1037,18 @@ def confirm_order(call):
     )
 
     carts[user_id] = []
-    order_states.pop(user_id, None)
+    order_states.pop(
+        user_id,
+        None
+    )
 
 
 @bot.callback_query_handler(func=lambda call: call.data == "cancel_order")
 def cancel_order(call):
-    order_states.pop(call.from_user.id, None)
+    order_states.pop(
+        call.from_user.id,
+        None
+    )
 
     bot.edit_message_text(
         "❌ Оформление заказа отменено.\n"
@@ -1015,8 +1057,6 @@ def cancel_order(call):
         call.message.message_id
     )
 
-
-# ---------------- ИНФОРМАЦИЯ ----------------
 
 @bot.message_handler(func=lambda m: m.text == "📍 Адрес")
 def address(message):
@@ -1048,8 +1088,6 @@ def privacy(message):
     )
 
 
-# ---------------- ПРОЧИЕ СООБЩЕНИЯ ----------------
-
 @bot.message_handler(func=lambda message: True)
 def other_messages(message):
     bot.send_message(
@@ -1058,8 +1096,6 @@ def other_messages(message):
         reply_markup=main_keyboard()
     )
 
-
-# ---------------- ЗАПУСК ----------------
 
 if __name__ == "__main__":
     threading.Thread(
