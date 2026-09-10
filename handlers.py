@@ -1121,3 +1121,308 @@ async def standalone_sauce_callback(
         callback,
         f"{sauce['name']} добавлен ✅",
     )
+@router.callback_query(
+    F.data == "cart"
+)
+async def cart_callback(
+    callback: CallbackQuery,
+) -> None:
+    cart = get_cart(
+        callback.from_user.id
+    )
+
+    await safe_edit(
+        callback,
+        format_cart(
+            callback.from_user.id
+        ),
+        cart_keyboard(
+            len(cart)
+        ),
+    )
+
+    await safe_answer_callback(callback)
+
+
+@router.callback_query(
+    F.data.startswith("cart:remove:")
+)
+async def cart_remove_callback(
+    callback: CallbackQuery,
+) -> None:
+    try:
+        index = int(
+            callback.data.split(
+                ":",
+                2,
+            )[2]
+        )
+    except ValueError:
+        await safe_answer_callback(
+            callback,
+            "Не удалось определить позицию",
+            True,
+        )
+        return
+
+    cart = get_cart(
+        callback.from_user.id
+    )
+
+    if (
+        index < 0
+        or index >= len(cart)
+    ):
+        await safe_answer_callback(
+            callback,
+            "Этой позиции уже нет",
+            True,
+        )
+        return
+
+    removed = cart.pop(index)
+
+    await safe_edit(
+        callback,
+        format_cart(
+            callback.from_user.id
+        ),
+        cart_keyboard(
+            len(cart)
+        ),
+    )
+
+    await safe_answer_callback(
+        callback,
+        f"Удалено: {removed['name']}",
+    )
+
+
+@router.callback_query(
+    F.data == "cart:clear"
+)
+async def cart_clear_callback(
+    callback: CallbackQuery,
+) -> None:
+    clear_cart(
+        callback.from_user.id
+    )
+
+    await safe_edit(
+        callback,
+        "🛒 *Корзина очищена*",
+        cart_keyboard(0),
+    )
+
+    await safe_answer_callback(
+        callback,
+        "Корзина очищена",
+    )
+
+
+@router.callback_query(
+    F.data == "checkout"
+)
+async def checkout_callback(
+    callback: CallbackQuery,
+    state: FSMContext,
+) -> None:
+    cart = get_cart(
+        callback.from_user.id
+    )
+
+    if not cart:
+        await safe_answer_callback(
+            callback,
+            "Корзина пустая",
+            True,
+        )
+        return
+
+    await state.clear()
+
+    await state.set_state(
+        CheckoutState.waiting_name
+    )
+
+    await callback.message.answer(
+        "👤 *Как вас зовут?*\n\n"
+        "Напишите имя одним сообщением."
+    )
+
+    await safe_answer_callback(callback)
+
+
+@router.message(
+    CheckoutState.waiting_name
+)
+async def checkout_name_handler(
+    message: Message,
+    state: FSMContext,
+) -> None:
+    name = (
+        message.text
+        or ""
+    ).strip()
+
+    if len(name) < 2:
+        await message.answer(
+            "⚠️ Имя слишком короткое.\n\n"
+            "Напишите имя ещё раз."
+        )
+        return
+
+    if len(name) > 60:
+        await message.answer(
+            "⚠️ Имя слишком длинное.\n\n"
+            "Введите более короткий вариант."
+        )
+        return
+
+    await state.update_data(
+        customer_name=name
+    )
+
+    await state.set_state(
+        CheckoutState.waiting_phone
+    )
+
+    await message.answer(
+        "☎️ *Введите номер телефона*\n\n"
+        "Например: `+7 912 123-45-67`"
+    )
+
+
+@router.message(
+    CheckoutState.waiting_phone
+)
+async def checkout_phone_handler(
+    message: Message,
+    state: FSMContext,
+) -> None:
+    phone = (
+        message.text
+        or ""
+    ).strip()
+
+    digits = "".join(
+        character
+        for character in phone
+        if character.isdigit()
+    )
+
+    if len(digits) < 10:
+        await message.answer(
+            "⚠️ Номер телефона выглядит "
+            "неполным.\n\n"
+            "Введите его ещё раз."
+        )
+        return
+
+    if len(digits) > 15:
+        await message.answer(
+            "⚠️ В номере слишком много цифр.\n\n"
+            "Введите его ещё раз."
+        )
+        return
+
+    await state.update_data(
+        customer_phone=phone
+    )
+
+    await state.set_state(
+        CheckoutState.waiting_pickup
+    )
+
+    await message.answer(
+        "⏰ *Через сколько вы подойдёте?*\n\n"
+        "Например:\n"
+        "• `через 20 минут`\n"
+        "• `через час`\n"
+        "• `в 18:30`"
+    )
+
+
+@router.message(
+    CheckoutState.waiting_pickup
+)
+async def checkout_pickup_handler(
+    message: Message,
+    state: FSMContext,
+) -> None:
+    pickup = (
+        message.text
+        or ""
+    ).strip()
+
+    if len(pickup) < 2:
+        await message.answer(
+            "⚠️ Укажите время самовывоза."
+        )
+        return
+
+    if len(pickup) > 80:
+        await message.answer(
+            "⚠️ Напишите время короче.\n\n"
+            "Например: `через 30 минут`."
+        )
+        return
+
+    await state.update_data(
+        pickup=pickup
+    )
+
+    await state.set_state(
+        CheckoutState.waiting_confirmation
+    )
+
+    data = await state.get_data()
+
+    text = (
+        f"{format_cart(message.from_user.id)}\n\n"
+        "──────────────\n"
+        "📋 *Данные для заказа*\n\n"
+        f"👤 Имя: *{data['customer_name']}*\n"
+        f"☎️ Телефон: *{data['customer_phone']}*\n"
+        f"⏰ Самовывоз: *{pickup}*\n\n"
+        "Проверьте заказ и нажмите "
+        "кнопку подтверждения."
+    )
+
+    await message.answer(
+        text,
+        reply_markup=(
+            confirm_order_keyboard()
+        ),
+    )
+
+
+@router.callback_query(
+    F.data == "order:cancel"
+)
+async def order_cancel_callback(
+    callback: CallbackQuery,
+    state: FSMContext,
+) -> None:
+    await state.clear()
+
+    cart = get_cart(
+        callback.from_user.id
+    )
+
+    await safe_edit(
+        callback,
+        (
+            "❌ *Оформление отменено*\n\n"
+            "Товары не удалены и "
+            "остались в корзине."
+        ),
+        cart_keyboard(
+            len(cart)
+        ),
+    )
+
+    await safe_answer_callback(
+        callback,
+        "Оформление отменено",
+    )
