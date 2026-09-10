@@ -1426,3 +1426,251 @@ async def order_cancel_callback(
         callback,
         "Оформление отменено",
     )
+    @router.callback_query(
+    CheckoutState.waiting_confirmation,
+    F.data == "order:confirm",
+)
+async def order_confirm_callback(
+    callback: CallbackQuery,
+    state: FSMContext,
+    bot: Bot,
+) -> None:
+    user_id = callback.from_user.id
+    cart = get_cart(user_id)
+
+    if not cart:
+        await safe_answer_callback(
+            callback,
+            "Корзина пустая",
+            True,
+        )
+        return
+
+    data = await state.get_data()
+
+    required_fields = {
+        "customer_name",
+        "customer_phone",
+        "pickup",
+    }
+
+    if not required_fields.issubset(
+        data.keys()
+    ):
+        await state.clear()
+
+        await safe_answer_callback(
+            callback,
+            "Данные заказа устарели",
+            True,
+        )
+        return
+
+    total = cart_total(user_id)
+
+    order_data = {
+        "telegram_id": user_id,
+        "username": (
+            callback.from_user.username
+            or ""
+        ),
+        "customer_name": (
+            data["customer_name"]
+        ),
+        "phone": (
+            data["customer_phone"]
+        ),
+        "pickup": (
+            data["pickup"]
+        ),
+        "total": total,
+        "items": cart.copy(),
+    }
+
+    try:
+        saved_order = await storage.save_order(
+            order_data
+        )
+    except Exception:
+        logging.exception(
+            "Ошибка сохранения заказа"
+        )
+
+        await safe_answer_callback(
+            callback,
+            "Не удалось сохранить заказ",
+            True,
+        )
+        return
+
+    order_id = saved_order[
+        "order_id"
+    ]
+
+    notification = (
+        f"🔥 *НОВЫЙ ЗАКАЗ №{order_id}*\n\n"
+        f"{format_cart(user_id)}\n\n"
+        "──────────────\n"
+        f"👤 Имя: "
+        f"*{saved_order['customer_name']}*\n"
+        f"☎️ Телефон: "
+        f"*{saved_order['phone']}*\n"
+        f"⏰ Самовывоз: "
+        f"*{saved_order['pickup']}*\n\n"
+        f"🆔 Telegram ID: `{user_id}`"
+    )
+
+    recipients = set(
+        ADMIN_IDS + KITCHEN_IDS
+    )
+
+    for recipient_id in recipients:
+        try:
+            await bot.send_message(
+                recipient_id,
+                notification,
+                reply_markup=(
+                    kitchen_order_keyboard(
+                        order_id
+                    )
+                ),
+            )
+        except Exception:
+            logging.exception(
+                "Не удалось отправить заказ "
+                "получателю %s",
+                recipient_id,
+            )
+
+    clear_cart(user_id)
+    await state.clear()
+
+    await safe_edit(
+        callback,
+        (
+            f"✅ *Заказ №{order_id} принят!*\n\n"
+            f"💵 Сумма: *{total} ₽*\n"
+            f"⏰ Самовывоз: "
+            f"*{saved_order['pickup']}*\n\n"
+            "Мы передали заказ на кухню.\n"
+            "Оплата — при получении ❤️"
+        ),
+        main_menu_keyboard(
+            is_admin(
+                user_id,
+                ADMIN_IDS,
+            )
+        ),
+    )
+
+    await safe_answer_callback(
+        callback,
+        "Заказ оформлен ✅",
+    )
+
+
+@router.callback_query(
+    F.data.startswith("kitchen:")
+)
+async def kitchen_status_callback(
+    callback: CallbackQuery,
+    bot: Bot,
+) -> None:
+    if not is_staff(
+        callback.from_user.id,
+        ADMIN_IDS,
+        KITCHEN_IDS,
+    ):
+        await safe_answer_callback(
+            callback,
+            "Нет доступа",
+            True,
+        )
+        return
+
+    try:
+        _, status, order_id_text = (
+            callback.data.split(
+                ":",
+                2,
+            )
+        )
+
+        order_id = int(
+            order_id_text
+        )
+    except ValueError:
+        await safe_answer_callback(
+            callback,
+            "Ошибка номера заказа",
+            True,
+        )
+        return
+
+    stats = await storage.get_stats()
+
+    order = next(
+        (
+            item
+            for item in stats.get(
+                "orders",
+                [],
+            )
+            if item.get(
+                "order_id"
+            ) == order_id
+        ),
+        None,
+    )
+
+    if not order:
+        await safe_answer_callback(
+            callback,
+            "Заказ не найден",
+            True,
+        )
+        return
+
+    customer_id = order.get(
+        "telegram_id"
+    )
+
+    if status == "accept":
+        try:
+            await bot.send_message(
+                customer_id,
+                (
+                    f"👨‍🍳 *Заказ №{order_id} "
+                    "принят в работу!*\n\n"
+                    "Мы начали его готовить."
+                ),
+            )
+        except Exception:
+            logging.exception(
+                "Не удалось уведомить клиента"
+            )
+
+        await safe_answer_callback(
+            callback,
+            "Заказ принят в работу",
+        )
+        return
+
+    if status == "ready":
+        try:
+            await bot.send_message(
+                customer_id,
+                (
+                    f"✅ *Заказ №{order_id} готов!*\n\n"
+                    "Можно забирать ❤️"
+                ),
+            )
+        except Exception:
+            logging.exception(
+                "Не удалось уведомить клиента"
+            )
+
+        await safe_answer_callback(
+            callback,
+            "Клиент уведомлён ✅",
+        )
