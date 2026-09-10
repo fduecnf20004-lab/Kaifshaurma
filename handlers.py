@@ -469,3 +469,655 @@ async def product_callback(
         callback,
         "Добавлено ✅",
     )
+@router.callback_query(
+    ShawarmaState.configuring,
+    F.data == "shawarma:addons",
+)
+async def shawarma_addons_callback(
+    callback: CallbackQuery,
+    state: FSMContext,
+) -> None:
+    data = await state.get_data()
+
+    selected_addons = set(
+        data.get("selected_addons", [])
+    )
+
+    await safe_edit(
+        callback,
+        "➕ *Добавки*\n\n"
+        "Нажмите на добавку, чтобы выбрать её.\n"
+        "Повторное нажатие уберёт добавку.",
+        await shawarma_addons_keyboard(
+            selected_addons
+        ),
+    )
+
+    await safe_answer_callback(callback)
+
+
+@router.callback_query(
+    ShawarmaState.configuring,
+    F.data.startswith("shawarma:addon:")
+)
+async def shawarma_addon_callback(
+    callback: CallbackQuery,
+    state: FSMContext,
+) -> None:
+    addon_id = callback.data.split(
+        ":",
+        2,
+    )[2]
+
+    addon = await find_addon(
+        addon_id
+    )
+
+    if not addon:
+        await safe_answer_callback(
+            callback,
+            "Добавка не найдена",
+            True,
+        )
+        return
+
+    data = await state.get_data()
+
+    selected_addons = set(
+        data.get("selected_addons", [])
+    )
+
+    if addon_id in selected_addons:
+        selected_addons.remove(
+            addon_id
+        )
+
+        text = "Добавка убрана"
+    else:
+        selected_addons.add(
+            addon_id
+        )
+
+        text = "Добавка выбрана"
+
+    await state.update_data(
+        selected_addons=list(
+            selected_addons
+        )
+    )
+
+    try:
+        await callback.message.edit_reply_markup(
+            reply_markup=(
+                await shawarma_addons_keyboard(
+                    selected_addons
+                )
+            )
+        )
+    except TelegramBadRequest:
+        pass
+
+    await safe_answer_callback(
+        callback,
+        text,
+    )
+
+
+@router.callback_query(
+    ShawarmaState.configuring,
+    F.data == "shawarma:sauces",
+)
+async def shawarma_sauces_callback(
+    callback: CallbackQuery,
+    state: FSMContext,
+) -> None:
+    data = await state.get_data()
+
+    selected_sauce = data.get(
+        "selected_sauce"
+    )
+
+    await safe_edit(
+        callback,
+        "🥫 *Дополнительный соус*\n\n"
+        "Выберите один соус.\n"
+        "Стоимость каждого — *60 ₽*.",
+        await sauces_keyboard(
+            "shawarma",
+            selected_sauce,
+        ),
+    )
+
+    await safe_answer_callback(callback)
+
+
+@router.callback_query(
+    ShawarmaState.configuring,
+    F.data == "shawarma:options",
+)
+async def shawarma_options_callback(
+    callback: CallbackQuery,
+    state: FSMContext,
+) -> None:
+    data = await state.get_data()
+
+    product = await find_product(
+        data.get(
+            "product_id",
+            "",
+        )
+    )
+
+    if not product:
+        await state.clear()
+
+        await safe_answer_callback(
+            callback,
+            "Позиция не найдена",
+            True,
+        )
+        return
+
+    selected_addons = set(
+        data.get("selected_addons", [])
+    )
+
+    selected_sauce = data.get(
+        "selected_sauce"
+    )
+
+    sauce_name = "не выбран"
+
+    if selected_sauce:
+        sauce = await find_sauce(
+            selected_sauce
+        )
+
+        if sauce:
+            sauce_name = sauce["name"]
+
+    await safe_edit(
+        callback,
+        (
+            f"{format_product_card(product)}\n\n"
+            f"➕ Добавок выбрано: "
+            f"*{len(selected_addons)}*\n"
+            f"🥫 Соус: *{sauce_name}*"
+        ),
+        await shawarma_options_keyboard(
+            selected_addons,
+            selected_sauce,
+        ),
+    )
+
+    await safe_answer_callback(callback)
+
+
+@router.callback_query(
+    F.data.startswith("sauce:")
+)
+async def sauce_callback(
+    callback: CallbackQuery,
+    state: FSMContext,
+) -> None:
+    try:
+        _, target, sauce_id = (
+            callback.data.split(
+                ":",
+                2,
+            )
+        )
+    except ValueError:
+        await safe_answer_callback(
+            callback,
+            "Ошибка выбора соуса",
+            True,
+        )
+        return
+
+    sauce = await find_sauce(
+        sauce_id
+    )
+
+    if not sauce:
+        await safe_answer_callback(
+            callback,
+            "Соус не найден",
+            True,
+        )
+        return
+
+    if target == "shawarma":
+        data = await state.get_data()
+
+        if not data.get("product_id"):
+            await safe_answer_callback(
+                callback,
+                "Сначала выберите шаурму",
+                True,
+            )
+            return
+
+        await state.update_data(
+            selected_sauce=sauce_id
+        )
+
+        selected_addons = set(
+            data.get(
+                "selected_addons",
+                [],
+            )
+        )
+
+        await safe_edit(
+            callback,
+            (
+                "🥫 *Соус выбран*\n\n"
+                f"{sauce['name']}\n"
+                f"+{sauce['price']} ₽"
+            ),
+            await shawarma_options_keyboard(
+                selected_addons,
+                sauce_id,
+            ),
+        )
+
+        await safe_answer_callback(
+            callback,
+            "Соус выбран ✅",
+        )
+        return
+
+    if target.startswith(
+        "product_"
+    ):
+        product_id = target.removeprefix(
+            "product_"
+        )
+
+        product = await find_product(
+            product_id
+        )
+
+        if not product:
+            await safe_answer_callback(
+                callback,
+                "Товар не найден",
+                True,
+            )
+            return
+
+        add_to_cart(
+            callback.from_user.id,
+            {
+                "product_id": product_id,
+                "name": format_product_name(
+                    product
+                ),
+                "base_price": product["price"],
+                "total_price": product["price"],
+                "details": [
+                    f"Соус: {sauce['name']}"
+                ],
+            },
+        )
+
+        await state.clear()
+
+        await safe_edit(
+            callback,
+            (
+                "✅ *Добавлено в корзину*\n\n"
+                f"{format_product_name(product)}\n"
+                f"🥫 Соус: {sauce['name']}\n"
+                f"💰 {product['price']} ₽\n\n"
+                f"🛒 В корзине на сумму: "
+                f"*{cart_total(callback.from_user.id)} ₽*"
+            ),
+            main_menu_keyboard(
+                is_admin(
+                    callback.from_user.id,
+                    ADMIN_IDS,
+                )
+            ),
+        )
+
+        await safe_answer_callback(
+            callback,
+            "Добавлено ✅",
+        )
+
+
+@router.callback_query(
+    ShawarmaState.configuring,
+    F.data == "shawarma:done",
+)
+async def shawarma_done_callback(
+    callback: CallbackQuery,
+    state: FSMContext,
+) -> None:
+    data = await state.get_data()
+
+    product = await find_product(
+        data.get(
+            "product_id",
+            "",
+        )
+    )
+
+    if not product:
+        await state.clear()
+
+        await safe_answer_callback(
+            callback,
+            "Шаурма не найдена",
+            True,
+        )
+        return
+
+    menu = await get_menu()
+
+    selected_addons = set(
+        data.get("selected_addons", [])
+    )
+
+    details = []
+    extras_total = 0
+
+    for addon in menu.get(
+        "addons",
+        [],
+    ):
+        if addon["id"] not in selected_addons:
+            continue
+
+        addon_price = int(
+            addon["price"]
+        )
+
+        extras_total += addon_price
+
+        details.append(
+            f"{addon['name']} "
+            f"(+{addon_price} ₽)"
+        )
+
+    selected_sauce = data.get(
+        "selected_sauce"
+    )
+
+    if selected_sauce:
+        sauce = await find_sauce(
+            selected_sauce
+        )
+
+        if sauce:
+            sauce_price = int(
+                sauce["price"]
+            )
+
+            extras_total += sauce_price
+
+            details.append(
+                f"Соус: {sauce['name']} "
+                f"(+{sauce_price} ₽)"
+            )
+
+    total_price = (
+        int(product["price"])
+        + extras_total
+    )
+
+    add_to_cart(
+        callback.from_user.id,
+        {
+            "product_id": product["id"],
+            "name": format_product_name(
+                product
+            ),
+            "base_price": product["price"],
+            "total_price": total_price,
+            "details": details,
+        },
+    )
+
+    await state.clear()
+
+    await safe_edit(
+        callback,
+        (
+            "✅ *Шаурма добавлена в корзину*\n\n"
+            f"{format_product_name(product)}\n"
+            f"💰 С добавками: "
+            f"*{total_price} ₽*\n\n"
+            f"🛒 Общая сумма корзины: "
+            f"*{cart_total(callback.from_user.id)} ₽*"
+        ),
+        main_menu_keyboard(
+            is_admin(
+                callback.from_user.id,
+                ADMIN_IDS,
+            )
+        ),
+    )
+
+    await safe_answer_callback(
+        callback,
+        "Добавлено ✅",
+    )
+
+
+@router.callback_query(
+    F.data.startswith("coffee:")
+)
+async def coffee_callback(
+    callback: CallbackQuery,
+    state: FSMContext,
+) -> None:
+    try:
+        _, product_id, coffee_id = (
+            callback.data.split(
+                ":",
+                2,
+            )
+        )
+    except ValueError:
+        await safe_answer_callback(
+            callback,
+            "Ошибка выбора кофе",
+            True,
+        )
+        return
+
+    product = await find_product(
+        product_id
+    )
+
+    coffee = await find_coffee(
+        coffee_id
+    )
+
+    if not product or not coffee:
+        await safe_answer_callback(
+            callback,
+            "Не удалось найти позицию",
+            True,
+        )
+        return
+
+    details = []
+
+    if product.get("description"):
+        details.append(
+            product["description"]
+        )
+
+    details.append(
+        f"Кофе: {coffee['name']} "
+        f"{coffee['volume']}"
+    )
+
+    add_to_cart(
+        callback.from_user.id,
+        {
+            "product_id": product_id,
+            "name": product["name"],
+            "base_price": product["price"],
+            "total_price": product["price"],
+            "details": details,
+        },
+    )
+
+    await state.clear()
+
+    await safe_edit(
+        callback,
+        (
+            "✅ *Комбо добавлено в корзину*\n\n"
+            f"{product['name']}\n"
+            f"☕ {coffee['name']} "
+            f"{coffee['volume']}\n"
+            f"💰 {product['price']} ₽\n\n"
+            f"🛒 Общая сумма: "
+            f"*{cart_total(callback.from_user.id)} ₽*"
+        ),
+        main_menu_keyboard(
+            is_admin(
+                callback.from_user.id,
+                ADMIN_IDS,
+            )
+        ),
+    )
+
+    await safe_answer_callback(
+        callback,
+        "Добавлено ✅",
+    )
+
+
+@router.callback_query(
+    F.data == "extras"
+)
+async def extras_callback(
+    callback: CallbackQuery,
+) -> None:
+    await safe_edit(
+        callback,
+        "➕ *Добавки*\n\n"
+        "Что хотите добавить?",
+        await extras_keyboard(),
+    )
+
+    await safe_answer_callback(callback)
+
+
+@router.callback_query(
+    F.data == "extras:addons"
+)
+async def extras_addons_callback(
+    callback: CallbackQuery,
+) -> None:
+    await safe_edit(
+        callback,
+        "➕ *Добавки*\n\n"
+        "Все добавки — по *60 ₽*.",
+        await standalone_addons_keyboard(),
+    )
+
+    await safe_answer_callback(callback)
+
+
+@router.callback_query(
+    F.data == "extras:sauces"
+)
+async def extras_sauces_callback(
+    callback: CallbackQuery,
+) -> None:
+    await safe_edit(
+        callback,
+        "🥫 *Соусы*\n\n"
+        "Все дополнительные соусы — по *60 ₽*.",
+        await standalone_sauces_keyboard(),
+    )
+
+    await safe_answer_callback(callback)
+
+
+@router.callback_query(
+    F.data.startswith("extra:addon:")
+)
+async def standalone_addon_callback(
+    callback: CallbackQuery,
+) -> None:
+    addon_id = callback.data.split(
+        ":",
+        2,
+    )[2]
+
+    addon = await find_addon(
+        addon_id
+    )
+
+    if not addon:
+        await safe_answer_callback(
+            callback,
+            "Добавка не найдена",
+            True,
+        )
+        return
+
+    add_to_cart(
+        callback.from_user.id,
+        {
+            "product_id": f"addon_{addon_id}",
+            "name": f"Добавка: {addon['name']}",
+            "base_price": addon["price"],
+            "total_price": addon["price"],
+            "details": [],
+        },
+    )
+
+    await safe_answer_callback(
+        callback,
+        f"{addon['name']} добавлено ✅",
+    )
+
+
+@router.callback_query(
+    F.data.startswith("extra:sauce:")
+)
+async def standalone_sauce_callback(
+    callback: CallbackQuery,
+) -> None:
+    sauce_id = callback.data.split(
+        ":",
+        2,
+    )[2]
+
+    sauce = await find_sauce(
+        sauce_id
+    )
+
+    if not sauce:
+        await safe_answer_callback(
+            callback,
+            "Соус не найден",
+            True,
+        )
+        return
+
+    add_to_cart(
+        callback.from_user.id,
+        {
+            "product_id": f"sauce_{sauce_id}",
+            "name": f"Соус: {sauce['name']}",
+            "base_price": sauce["price"],
+            "total_price": sauce["price"],
+            "details": [],
+        },
+    )
+
+    await safe_answer_callback(
+        callback,
+        f"{sauce['name']} добавлен ✅",
+    )
