@@ -21,5 +21,5 @@ STATS_FILE = "data/stats.json"
 
 BUSINESS_NAME = "Кайф Шаурма"
 
-ADDRESS = "Укажите адрес"
-CONTACT = "Укажите контакт"
+ADDRESS = "г.Ижевск, ул.Некрасова д.35 к.1"
+CONTACT = "+7 992 223 77 68"
