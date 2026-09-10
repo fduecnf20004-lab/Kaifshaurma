@@ -1,6 +1,6 @@
-import logging
+import logging 
+from datetime import datetime
 from typing import Any
-
 from aiogram import Bot, F, Router
 from aiogram.exceptions import TelegramBadRequest
 from aiogram.filters import Command, CommandStart
@@ -1674,3 +1674,276 @@ async def kitchen_status_callback(
             callback,
             "Клиент уведомлён ✅",
         )
+        @router.callback_query(
+    F.data == "address"
+)
+async def address_callback(
+    callback: CallbackQuery,
+) -> None:
+    await safe_edit(
+        callback,
+        (
+            "📍 *Наш адрес*\n\n"
+            f"{ADDRESS}"
+        ),
+        main_menu_keyboard(
+            is_admin(
+                callback.from_user.id,
+                ADMIN_IDS,
+            )
+        ),
+    )
+
+    await safe_answer_callback(callback)
+
+
+@router.callback_query(
+    F.data == "contact"
+)
+async def contact_callback(
+    callback: CallbackQuery,
+) -> None:
+    await safe_edit(
+        callback,
+        (
+            "☎️ *Связаться с нами*\n\n"
+            f"{CONTACT}"
+        ),
+        main_menu_keyboard(
+            is_admin(
+                callback.from_user.id,
+                ADMIN_IDS,
+            )
+        ),
+    )
+
+    await safe_answer_callback(callback)
+
+
+@router.callback_query(
+    F.data == "privacy"
+)
+async def privacy_callback(
+    callback: CallbackQuery,
+) -> None:
+    text = (
+        "🔒 *Политика конфиденциальности*\n\n"
+        "Для оформления заказа бот "
+        "может получать следующие данные:\n\n"
+        "• имя\n"
+        "• номер телефона\n"
+        "• Telegram ID\n"
+        "• состав заказа\n"
+        "• время самовывоза\n\n"
+        "Эти данные используются "
+        "только для приёма и выполнения заказа.\n\n"
+        "Информация не используется "
+        "для рекламных рассылок "
+        "и не передаётся посторонним лицам."
+    )
+
+    await safe_edit(
+        callback,
+        text,
+        main_menu_keyboard(
+            is_admin(
+                callback.from_user.id,
+                ADMIN_IDS,
+            )
+        ),
+    )
+
+    await safe_answer_callback(callback)
+
+
+@router.callback_query(
+    F.data == "admin"
+)
+async def admin_callback(
+    callback: CallbackQuery,
+) -> None:
+    if not is_admin(
+        callback.from_user.id,
+        ADMIN_IDS,
+    ):
+        await safe_answer_callback(
+            callback,
+            "Нет доступа",
+            True,
+        )
+        return
+
+    await safe_edit(
+        callback,
+        "⚙️ *Админ-панель*\n\n"
+        "Выберите раздел:",
+        admin_keyboard(),
+    )
+
+    await safe_answer_callback(callback)
+
+
+@router.callback_query(
+    F.data == "admin:stats"
+)
+async def admin_stats_callback(
+    callback: CallbackQuery,
+) -> None:
+    if not is_admin(
+        callback.from_user.id,
+        ADMIN_IDS,
+    ):
+        await safe_answer_callback(
+            callback,
+            "Нет доступа",
+            True,
+        )
+        return
+
+    try:
+        stats = await storage.get_stats()
+    except Exception:
+        logging.exception(
+            "Ошибка получения статистики"
+        )
+
+        await safe_answer_callback(
+            callback,
+            "Не удалось загрузить статистику",
+            True,
+        )
+        return
+
+    orders = stats.get(
+        "orders",
+        [],
+    )
+
+    total_orders = int(
+        stats.get(
+            "total_orders",
+            0,
+        )
+    )
+
+    total_revenue = int(
+        stats.get(
+            "total_revenue",
+            0,
+        )
+    )
+
+    if total_orders:
+        average_check = round(
+            total_revenue
+            / total_orders
+        )
+    else:
+        average_check = 0
+
+    today = datetime.now().date()
+
+    today_orders = 0
+    today_revenue = 0
+
+    for order in orders:
+        created_at = order.get(
+            "created_at"
+        )
+
+        if not created_at:
+            continue
+
+        try:
+            order_date = (
+                datetime.fromisoformat(
+                    created_at
+                ).date()
+            )
+        except ValueError:
+            continue
+
+        if order_date == today:
+            today_orders += 1
+
+            today_revenue += int(
+                order.get(
+                    "total",
+                    0,
+                )
+            )
+
+    text = (
+        "📊 *Статистика Кайф Шаурма*\n\n"
+        "📅 *Сегодня*\n"
+        f"🧾 Заказов: *{today_orders}*\n"
+        f"💰 Выручка: *{today_revenue} ₽*\n\n"
+        "📈 *За всё время*\n"
+        f"🧾 Заказов: *{total_orders}*\n"
+        f"💰 Выручка: *{total_revenue} ₽*\n"
+        f"🧮 Средний чек: *{average_check} ₽*"
+    )
+
+    if orders:
+        last_order = orders[-1]
+
+        text += (
+            "\n\n"
+            "🕒 *Последний заказ*\n"
+            f"№{last_order.get('order_id', '—')}\n"
+            f"👤 "
+            f"{last_order.get('customer_name', '—')}\n"
+            f"💵 "
+            f"{last_order.get('total', 0)} ₽\n"
+            f"⏰ "
+            f"{last_order.get('pickup', '—')}"
+        )
+
+    await safe_edit(
+        callback,
+        text,
+        admin_keyboard(),
+    )
+
+    await safe_answer_callback(callback)
+
+
+@router.errors()
+async def error_handler(
+    event: ErrorEvent,
+) -> bool:
+    logging.error(
+        "Необработанная ошибка: %s",
+        event.exception,
+        exc_info=(
+            type(event.exception),
+            event.exception,
+            event.exception.__traceback__,
+        ),
+    )
+
+    try:
+        if event.update.callback_query:
+            await safe_answer_callback(
+                event.update.callback_query,
+                (
+                    "Произошла ошибка. "
+                    "Попробуйте ещё раз."
+                ),
+                True,
+            )
+
+        elif event.update.message:
+            await event.update.message.answer(
+                "⚠️ Произошла ошибка.\n\n"
+                "Попробуйте ещё раз "
+                "или отправьте /start."
+            )
+
+    except Exception:
+        logging.exception(
+            "Не удалось сообщить "
+            "пользователю об ошибке"
+        )
+
+    return True
