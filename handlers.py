@@ -1426,9 +1426,9 @@ async def order_cancel_callback(
         callback,
         "Оформление отменено",
     )
-    @router.callback_query(
-    CheckoutState.waiting_confirmation,
-    F.data == "order:confirm",
+@router.callback_query(
+CheckoutState.waiting_confirmation,
+F.data == "order:confirm",
 )
 async def order_confirm_callback(
     callback: CallbackQuery,
