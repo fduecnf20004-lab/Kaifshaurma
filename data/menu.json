@@ -1,0 +1,524 @@
+{
+  "settings": {
+    "currency": "₽",
+    "pickup_only": true,
+    "addon_price": 60,
+    "sauce_price": 60
+  },
+  "categories": [
+    {
+      "id": "shawarma",
+      "name": "🌯 Шаурма",
+      "short_name": "🌯 Шаурма",
+      "subcategories": [
+        {
+          "id": "chicken",
+          "name": "🐔 С курицей",
+          "short_name": "🐔 Курица",
+          "items": [
+            {
+              "id": "shaw_ch_fire",
+              "name": "Огненно-острая шаурма с курицей",
+              "short_name": "🔥 Огненно-острая",
+              "weight": "320 г",
+              "price": 380,
+              "allow_extras": true,
+              "allow_extra_sauce": true
+            },
+            {
+              "id": "shaw_ch_mini",
+              "name": "Шаурма с курицей мини",
+              "short_name": "🌯 Мини",
+              "weight": "200 г",
+              "price": 250,
+              "allow_extras": true,
+              "allow_extra_sauce": true
+            },
+            {
+              "id": "shaw_ch_standard",
+              "name": "Шаурма с курицей стандарт",
+              "short_name": "🌯 Стандарт",
+              "weight": "320 г",
+              "price": 315,
+              "allow_extras": true,
+              "allow_extra_sauce": true
+            },
+            {
+              "id": "shaw_ch_student",
+              "name": "Шаурма студенческая с курицей",
+              "short_name": "🎓 Студенческая",
+              "weight": "320 г",
+              "price": 250,
+              "allow_extras": true,
+              "allow_extra_sauce": true
+            },
+            {
+              "id": "shaw_ch_big",
+              "name": "Шаурма с курицей большая",
+              "short_name": "🌯 Большая",
+              "weight": "430 г",
+              "price": 370,
+              "allow_extras": true,
+              "allow_extra_sauce": true
+            }
+          ]
+        },
+        {
+          "id": "pork",
+          "name": "🐷 Со свининой",
+          "short_name": "🐷 Свинина",
+          "items": [
+            {
+              "id": "shaw_pork_fire",
+              "name": "Огненно-острая шаурма со свининой",
+              "short_name": "🔥 Огненно-острая",
+              "weight": "320 г",
+              "price": 420,
+              "allow_extras": true,
+              "allow_extra_sauce": true
+            },
+            {
+              "id": "shaw_pork_mini",
+              "name": "Шаурма со свининой мини",
+              "short_name": "🌯 Мини",
+              "weight": "200 г",
+              "price": 285,
+              "allow_extras": true,
+              "allow_extra_sauce": true
+            },
+            {
+              "id": "shaw_pork_standard",
+              "name": "Шаурма со свининой стандарт",
+              "short_name": "🌯 Стандарт",
+              "weight": "320 г",
+              "price": 350,
+              "allow_extras": true,
+              "allow_extra_sauce": true
+            },
+            {
+              "id": "shaw_pork_student",
+              "name": "Шаурма студенческая со свининой",
+              "short_name": "🎓 Студенческая",
+              "weight": "320 г",
+              "price": 280,
+              "allow_extras": true,
+              "allow_extra_sauce": true
+            },
+            {
+              "id": "shaw_pork_big",
+              "name": "Шаурма со свининой большая",
+              "short_name": "🌯 Большая",
+              "weight": "420 г",
+              "price": 395,
+              "allow_extras": true,
+              "allow_extra_sauce": true
+            }
+          ]
+        },
+        {
+          "id": "vegan",
+          "name": "🌱 Веган",
+          "short_name": "🌱 Веган",
+          "items": [
+            {
+              "id": "shaw_vegan_mini",
+              "name": "Шаурма веган мини",
+              "short_name": "🌱 Мини",
+              "weight": "200 г",
+              "price": 270,
+              "allow_extras": true,
+              "allow_extra_sauce": true
+            },
+            {
+              "id": "shaw_vegan_standard",
+              "name": "Шаурма веган стандарт",
+              "short_name": "🌱 Стандарт",
+              "weight": "320 г",
+              "price": 320,
+              "allow_extras": true,
+              "allow_extra_sauce": true
+            },
+            {
+              "id": "shaw_vegan_big",
+              "name": "Шаурма веган большая",
+              "short_name": "🌱 Большая",
+              "weight": "430 г",
+              "price": 370,
+              "allow_extras": true,
+              "allow_extra_sauce": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "doners",
+      "name": "🥙 Донеры",
+      "short_name": "🥙 Донеры",
+      "items": [
+        {
+          "id": "doner_chicken",
+          "name": "Донер с курицей",
+          "short_name": "🐔 С курицей",
+          "price": 390
+        },
+        {
+          "id": "doner_pork",
+          "name": "Донер со свининой",
+          "short_name": "🐷 Со свининой",
+          "price": 410
+        }
+      ]
+    },
+    {
+      "id": "combos",
+      "name": "🍱 Комбо-наборы",
+      "short_name": "🍱 Комбо",
+      "items": [
+        {
+          "id": "combo_1",
+          "name": "Комбо №1",
+          "short_name": "1️⃣ Комбо №1",
+          "description": "Шаурма с курицей стандарт + кофе 200 мл",
+          "price": 420,
+          "selection": {
+            "type": "coffee",
+            "required": true
+          }
+        },
+        {
+          "id": "combo_2",
+          "name": "Комбо №2",
+          "short_name": "2️⃣ Комбо №2",
+          "description": "Шаурма с курицей стандарт + картофель фри 100 г + соус",
+          "price": 470,
+          "selection": {
+            "type": "sauce",
+            "required": true,
+            "included": true
+          }
+        },
+        {
+          "id": "combo_3",
+          "name": "Комбо №3",
+          "short_name": "3️⃣ Комбо №3",
+          "description": "Чикен-бургер + картофель фри 100 г + соус",
+          "price": 520,
+          "selection": {
+            "type": "sauce",
+            "required": true,
+            "included": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "shashlik",
+      "name": "🔥 Шашлык",
+      "short_name": "🔥 Шашлык",
+      "items": [
+        {
+          "id": "shash_ch_200",
+          "name": "Шашлык из курицы",
+          "short_name": "🐔 Курица · 200 г",
+          "weight": "200 г",
+          "price": 395
+        },
+        {
+          "id": "shash_ch_300",
+          "name": "Шашлык из курицы",
+          "short_name": "🐔 Курица · 300 г",
+          "weight": "300 г",
+          "price": 505
+        },
+        {
+          "id": "shash_pork_200",
+          "name": "Шашлык из свинины",
+          "short_name": "🐷 Свинина · 200 г",
+          "weight": "200 г",
+          "price": 445
+        },
+        {
+          "id": "shash_pork_300",
+          "name": "Шашлык из свинины",
+          "short_name": "🐷 Свинина · 300 г",
+          "weight": "300 г",
+          "price": 555
+        }
+      ]
+    },
+    {
+      "id": "lulya",
+      "name": "🍢 Люля в лаваше",
+      "short_name": "🍢 Люля",
+      "items": [
+        {
+          "id": "lulya_beef",
+          "name": "Люля в лаваше с говядиной",
+          "short_name": "🥩 Говядина",
+          "weight": "200 г",
+          "price": 420
+        },
+        {
+          "id": "lulya_chicken",
+          "name": "Люля в лаваше с курицей",
+          "short_name": "🐔 Курица",
+          "weight": "200 г",
+          "price": 390
+        }
+      ]
+    },
+    {
+      "id": "snacks",
+      "name": "🍟 Снэки",
+      "short_name": "🍟 Снэки",
+      "items": [
+        {
+          "id": "country_100",
+          "name": "Картофель по-деревенски",
+          "short_name": "🥔 По-деревенски · 100 г",
+          "weight": "100 г",
+          "price": 190
+        },
+        {
+          "id": "country_200",
+          "name": "Картофель по-деревенски + соус",
+          "short_name": "🥔 По-деревенски · 200 г",
+          "weight": "200 г",
+          "price": 270,
+          "selection": {
+            "type": "sauce",
+            "required": true,
+            "included": true
+          }
+        },
+        {
+          "id": "fries_100",
+          "name": "Картофель фри",
+          "short_name": "🍟 Фри · 100 г",
+          "weight": "100 г",
+          "price": 180
+        },
+        {
+          "id": "fries_200",
+          "name": "Картофель фри + соус",
+          "short_name": "🍟 Фри · 200 г",
+          "weight": "200 г",
+          "price": 260,
+          "selection": {
+            "type": "sauce",
+            "required": true,
+            "included": true
+          }
+        },
+        {
+          "id": "nuggets_4_fries",
+          "name": "Наггетсы 4 шт. + картофель фри 100 г",
+          "short_name": "🍗 4 наггетса + фри",
+          "price": 260
+        },
+        {
+          "id": "nuggets_6",
+          "name": "Наггетсы 6 шт.",
+          "short_name": "🍗 Наггетсы · 6 шт.",
+          "price": 260
+        },
+        {
+          "id": "cheese_sticks",
+          "name": "Сырные палочки 6 шт. + соус",
+          "short_name": "🧀 Сырные палочки · 6 шт.",
+          "price": 335,
+          "selection": {
+            "type": "sauce",
+            "required": true,
+            "included": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "sandwiches",
+      "name": "🥪 Сэндвичи",
+      "short_name": "🥪 Сэндвичи",
+      "items": [
+        {
+          "id": "sandwich_chicken",
+          "name": "Сэндвич с курицей",
+          "short_name": "🐔 С курицей",
+          "weight": "200 г",
+          "price": 265
+        },
+        {
+          "id": "sandwich_pork",
+          "name": "Сэндвич со свининой",
+          "short_name": "🐷 Со свининой",
+          "weight": "200 г",
+          "price": 275
+        }
+      ]
+    },
+    {
+      "id": "burgers",
+      "name": "🍔 Бургеры",
+      "short_name": "🍔 Бургеры",
+      "items": [
+        {
+          "id": "burger_beef",
+          "name": "Гамбургер с говядиной",
+          "short_name": "🥩 Гамбургер",
+          "price": 440
+        },
+        {
+          "id": "burger_chicken",
+          "name": "Чикен-бургер",
+          "short_name": "🐔 Чикен-бургер",
+          "price": 400
+        }
+      ]
+    }
+  ],
+  "addons": [
+    {
+      "id": "pineapple",
+      "name": "Ананас",
+      "short_name": "🍍 Ананас",
+      "price": 60
+    },
+    {
+      "id": "greens_onion",
+      "name": "Зелень с луком",
+      "short_name": "🌿 Зелень + лук",
+      "price": 60
+    },
+    {
+      "id": "crispy_onion",
+      "name": "Лук хрустящий",
+      "short_name": "🧅 Хрустящий лук",
+      "price": 60
+    },
+    {
+      "id": "pickles",
+      "name": "Маринованные огурцы",
+      "short_name": "🥒 Марин. огурцы",
+      "price": 60
+    },
+    {
+      "id": "korean_carrot",
+      "name": "Морковь по-корейски",
+      "short_name": "🥕 Корейская морковь",
+      "price": 60
+    },
+    {
+      "id": "olives",
+      "name": "Оливки",
+      "short_name": "🫒 Оливки",
+      "price": 60
+    },
+    {
+      "id": "hard_cheese",
+      "name": "Сыр твёрдый",
+      "short_name": "🧀 Твёрдый сыр",
+      "price": 60
+    },
+    {
+      "id": "fries",
+      "name": "Картофель фри",
+      "short_name": "🍟 Фри",
+      "price": 60
+    },
+    {
+      "id": "jalapeno",
+      "name": "Халапеньо",
+      "short_name": "🌶 Халапеньо",
+      "price": 60
+    }
+  ],
+  "sauces": [
+    {
+      "id": "mushroom",
+      "name": "Грибной",
+      "short_name": "🍄 Грибной",
+      "price": 60
+    },
+    {
+      "id": "bbq",
+      "name": "Барбекю",
+      "short_name": "🔥 Барбекю",
+      "price": 60
+    },
+    {
+      "id": "burger",
+      "name": "Бургер",
+      "short_name": "🍔 Бургер",
+      "price": 60
+    },
+    {
+      "id": "mustard",
+      "name": "Горчичный",
+      "short_name": "🌭 Горчичный",
+      "price": 60
+    },
+    {
+      "id": "sweet_sour",
+      "name": "Кисло-сладкий",
+      "short_name": "🥫 Кисло-сладкий",
+      "price": 60
+    },
+    {
+      "id": "cheese",
+      "name": "Сырный",
+      "short_name": "🧀 Сырный",
+      "price": 60
+    },
+    {
+      "id": "tomato",
+      "name": "Томатный",
+      "short_name": "🍅 Томатный",
+      "price": 60
+    },
+    {
+      "id": "shawarma_signature",
+      "name": "Фирменный для шаурмы",
+      "short_name": "🌯 Фирменный шаурма",
+      "price": 60
+    },
+    {
+      "id": "garlic",
+      "name": "Чесночный",
+      "short_name": "🧄 Чесночный",
+      "price": 60
+    },
+    {
+      "id": "sriracha",
+      "name": "Шрирача",
+      "short_name": "🌶 Шрирача",
+      "price": 60
+    },
+    {
+      "id": "shashlik_signature",
+      "name": "Фирменный для шашлыка",
+      "short_name": "🔥 Фирменный шашлык",
+      "price": 60
+    }
+  ],
+  "coffee": [
+    {
+      "id": "americano_200",
+      "name": "Американо",
+      "short_name": "☕ Американо",
+      "volume": "200 мл"
+    },
+    {
+      "id": "cappuccino_200",
+      "name": "Капучино",
+      "short_name": "☕ Капучино",
+      "volume": "200 мл"
+    },
+    {
+      "id": "latte_200",
+      "name": "Латте",
+      "short_name": "☕ Латте",
+      "volume": "200 мл"
+    }
+  ]
+}
