@@ -1,6 +1,6 @@
-import logging 
+import logging
 from datetime import datetime
-from typing import Any
+
 from aiogram import Bot, F, Router
 from aiogram.exceptions import TelegramBadRequest
 from aiogram.filters import Command, CommandStart
@@ -151,7 +151,10 @@ async def show_home(
     )
 
     keyboard = main_menu_keyboard(
-        is_admin(user_id, ADMIN_IDS)
+        is_admin(
+            user_id,
+            ADMIN_IDS,
+        )
     )
 
     if isinstance(target, CallbackQuery):
@@ -255,15 +258,11 @@ async def category_callback(
         )
         return
 
-    subcategories = category.get(
-        "subcategories",
-        [],
-    )
-
-    if subcategories:
+    if category.get("subcategories"):
         await safe_edit(
             callback,
-            f"*{category['name']}*\n\nВыберите раздел:",
+            f"*{category['name']}*\n\n"
+            "Выберите раздел:",
             await subcategories_keyboard(
                 category_id
             ),
@@ -272,16 +271,15 @@ async def category_callback(
         await safe_answer_callback(callback)
         return
 
-    items = category.get(
-        "items",
-        [],
-    )
-
     await safe_edit(
         callback,
-        f"*{category['name']}*\n\nВыберите позицию:",
+        f"*{category['name']}*\n\n"
+        "Выберите позицию:",
         products_keyboard(
-            items,
+            category.get(
+                "items",
+                [],
+            ),
             "menu",
         ),
     )
@@ -297,7 +295,10 @@ async def subcategory_callback(
 ) -> None:
     try:
         _, category_id, subcategory_id = (
-            callback.data.split(":", 2)
+            callback.data.split(
+                ":",
+                2,
+            )
         )
     except ValueError:
         await safe_answer_callback(
@@ -322,7 +323,8 @@ async def subcategory_callback(
 
     await safe_edit(
         callback,
-        f"*{subcategory['name']}*\n\nВыберите позицию:",
+        f"*{subcategory['name']}*\n\n"
+        "Выберите позицию:",
         products_keyboard(
             subcategory.get(
                 "items",
@@ -389,51 +391,39 @@ async def product_callback(
         return
 
     selection = product.get(
-        "selection"
+        "selection",
+        {},
     )
 
-    if selection:
-        selection_type = selection.get(
-            "type"
+    if selection.get("type") == "coffee":
+        await safe_edit(
+            callback,
+            (
+                f"{format_product_card(product)}\n\n"
+                "☕ *Выберите кофе:*"
+            ),
+            await coffee_keyboard(
+                product_id
+            ),
         )
 
-        if selection_type == "coffee":
-            await state.update_data(
-                pending_product_id=product_id
-            )
+        await safe_answer_callback(callback)
+        return
 
-            await safe_edit(
-                callback,
-                (
-                    f"{format_product_card(product)}\n\n"
-                    "☕ *Выберите кофе:*"
-                ),
-                await coffee_keyboard(
-                    product_id
-                ),
-            )
+    if selection.get("type") == "sauce":
+        await safe_edit(
+            callback,
+            (
+                f"{format_product_card(product)}\n\n"
+                "🥫 *Выберите соус:*"
+            ),
+            await sauces_keyboard(
+                f"product_{product_id}"
+            ),
+        )
 
-            await safe_answer_callback(callback)
-            return
-
-        if selection_type == "sauce":
-            await state.update_data(
-                pending_product_id=product_id
-            )
-
-            await safe_edit(
-                callback,
-                (
-                    f"{format_product_card(product)}\n\n"
-                    "🥫 *Выберите соус:*"
-                ),
-                await sauces_keyboard(
-                    f"product_{product_id}"
-                ),
-            )
-
-            await safe_answer_callback(callback)
-            return
+        await safe_answer_callback(callback)
+        return
 
     add_to_cart(
         callback.from_user.id,
@@ -469,6 +459,8 @@ async def product_callback(
         callback,
         "Добавлено ✅",
     )
+
+
 @router.callback_query(
     ShawarmaState.configuring,
     F.data == "shawarma:addons",
@@ -479,17 +471,22 @@ async def shawarma_addons_callback(
 ) -> None:
     data = await state.get_data()
 
-    selected_addons = set(
-        data.get("selected_addons", [])
+    selected = set(
+        data.get(
+            "selected_addons",
+            [],
+        )
     )
 
     await safe_edit(
         callback,
-        "➕ *Добавки*\n\n"
-        "Нажмите на добавку, чтобы выбрать её.\n"
-        "Повторное нажатие уберёт добавку.",
+        (
+            "➕ *Добавки*\n\n"
+            "Нажмите на добавку, "
+            "чтобы выбрать или убрать её."
+        ),
         await shawarma_addons_keyboard(
-            selected_addons
+            selected
         ),
     )
 
@@ -498,7 +495,7 @@ async def shawarma_addons_callback(
 
 @router.callback_query(
     ShawarmaState.configuring,
-    F.data.startswith("shawarma:addon:")
+    F.data.startswith("shawarma:addon:"),
 )
 async def shawarma_addon_callback(
     callback: CallbackQuery,
@@ -523,34 +520,29 @@ async def shawarma_addon_callback(
 
     data = await state.get_data()
 
-    selected_addons = set(
-        data.get("selected_addons", [])
+    selected = set(
+        data.get(
+            "selected_addons",
+            [],
+        )
     )
 
-    if addon_id in selected_addons:
-        selected_addons.remove(
-            addon_id
-        )
-
+    if addon_id in selected:
+        selected.remove(addon_id)
         text = "Добавка убрана"
     else:
-        selected_addons.add(
-            addon_id
-        )
-
+        selected.add(addon_id)
         text = "Добавка выбрана"
 
     await state.update_data(
-        selected_addons=list(
-            selected_addons
-        )
+        selected_addons=list(selected)
     )
 
     try:
         await callback.message.edit_reply_markup(
             reply_markup=(
                 await shawarma_addons_keyboard(
-                    selected_addons
+                    selected
                 )
             )
         )
@@ -573,18 +565,16 @@ async def shawarma_sauces_callback(
 ) -> None:
     data = await state.get_data()
 
-    selected_sauce = data.get(
-        "selected_sauce"
-    )
-
     await safe_edit(
         callback,
-        "🥫 *Дополнительный соус*\n\n"
-        "Выберите один соус.\n"
-        "Стоимость каждого — *60 ₽*.",
+        (
+            "🥫 *Дополнительный соус*\n\n"
+            "Выберите один соус.\n"
+            "Стоимость — *60 ₽*."
+        ),
         await sauces_keyboard(
             "shawarma",
-            selected_sauce,
+            data.get("selected_sauce"),
         ),
     )
 
@@ -618,19 +608,22 @@ async def shawarma_options_callback(
         )
         return
 
-    selected_addons = set(
-        data.get("selected_addons", [])
+    selected = set(
+        data.get(
+            "selected_addons",
+            [],
+        )
     )
 
-    selected_sauce = data.get(
+    sauce_id = data.get(
         "selected_sauce"
     )
 
     sauce_name = "не выбран"
 
-    if selected_sauce:
+    if sauce_id:
         sauce = await find_sauce(
-            selected_sauce
+            sauce_id
         )
 
         if sauce:
@@ -641,12 +634,12 @@ async def shawarma_options_callback(
         (
             f"{format_product_card(product)}\n\n"
             f"➕ Добавок выбрано: "
-            f"*{len(selected_addons)}*\n"
+            f"*{len(selected)}*\n"
             f"🥫 Соус: *{sauce_name}*"
         ),
         await shawarma_options_keyboard(
-            selected_addons,
-            selected_sauce,
+            selected,
+            sauce_id,
         ),
     )
 
@@ -702,7 +695,7 @@ async def sauce_callback(
             selected_sauce=sauce_id
         )
 
-        selected_addons = set(
+        selected = set(
             data.get(
                 "selected_addons",
                 [],
@@ -717,7 +710,7 @@ async def sauce_callback(
                 f"+{sauce['price']} ₽"
             ),
             await shawarma_options_keyboard(
-                selected_addons,
+                selected,
                 sauce_id,
             ),
         )
@@ -728,9 +721,7 @@ async def sauce_callback(
         )
         return
 
-    if target.startswith(
-        "product_"
-    ):
+    if target.startswith("product_"):
         product_id = target.removeprefix(
             "product_"
         )
@@ -817,8 +808,11 @@ async def shawarma_done_callback(
 
     menu = await get_menu()
 
-    selected_addons = set(
-        data.get("selected_addons", [])
+    selected = set(
+        data.get(
+            "selected_addons",
+            [],
+        )
     )
 
     details = []
@@ -828,39 +822,39 @@ async def shawarma_done_callback(
         "addons",
         [],
     ):
-        if addon["id"] not in selected_addons:
+        if addon["id"] not in selected:
             continue
 
-        addon_price = int(
+        price = int(
             addon["price"]
         )
 
-        extras_total += addon_price
+        extras_total += price
 
         details.append(
             f"{addon['name']} "
-            f"(+{addon_price} ₽)"
+            f"(+{price} ₽)"
         )
 
-    selected_sauce = data.get(
+    sauce_id = data.get(
         "selected_sauce"
     )
 
-    if selected_sauce:
+    if sauce_id:
         sauce = await find_sauce(
-            selected_sauce
+            sauce_id
         )
 
         if sauce:
-            sauce_price = int(
+            price = int(
                 sauce["price"]
             )
 
-            extras_total += sauce_price
+            extras_total += price
 
             details.append(
                 f"Соус: {sauce['name']} "
-                f"(+{sauce_price} ₽)"
+                f"(+{price} ₽)"
             )
 
     total_price = (
@@ -890,7 +884,7 @@ async def shawarma_done_callback(
             f"{format_product_name(product)}\n"
             f"💰 С добавками: "
             f"*{total_price} ₽*\n\n"
-            f"🛒 Общая сумма корзины: "
+            f"🛒 Общая сумма: "
             f"*{cart_total(callback.from_user.id)} ₽*"
         ),
         main_menu_keyboard(
@@ -1003,8 +997,7 @@ async def extras_callback(
 ) -> None:
     await safe_edit(
         callback,
-        "➕ *Добавки*\n\n"
-        "Что хотите добавить?",
+        "➕ *Добавки*\n\nЧто хотите добавить?",
         await extras_keyboard(),
     )
 
@@ -1070,7 +1063,9 @@ async def standalone_addon_callback(
         callback.from_user.id,
         {
             "product_id": f"addon_{addon_id}",
-            "name": f"Добавка: {addon['name']}",
+            "name": (
+                f"Добавка: {addon['name']}"
+            ),
             "base_price": addon["price"],
             "total_price": addon["price"],
             "details": [],
@@ -1110,7 +1105,9 @@ async def standalone_sauce_callback(
         callback.from_user.id,
         {
             "product_id": f"sauce_{sauce_id}",
-            "name": f"Соус: {sauce['name']}",
+            "name": (
+                f"Соус: {sauce['name']}"
+            ),
             "base_price": sauce["price"],
             "total_price": sauce["price"],
             "details": [],
@@ -1121,6 +1118,8 @@ async def standalone_sauce_callback(
         callback,
         f"{sauce['name']} добавлен ✅",
     )
+
+
 @router.callback_query(
     F.data == "cart"
 )
@@ -1160,7 +1159,7 @@ async def cart_remove_callback(
     except ValueError:
         await safe_answer_callback(
             callback,
-            "Не удалось определить позицию",
+            "Ошибка позиции",
             True,
         )
         return
@@ -1169,13 +1168,10 @@ async def cart_remove_callback(
         callback.from_user.id
     )
 
-    if (
-        index < 0
-        or index >= len(cart)
-    ):
+    if index < 0 or index >= len(cart):
         await safe_answer_callback(
             callback,
-            "Этой позиции уже нет",
+            "Позиция уже удалена",
             True,
         )
         return
@@ -1227,11 +1223,9 @@ async def checkout_callback(
     callback: CallbackQuery,
     state: FSMContext,
 ) -> None:
-    cart = get_cart(
+    if not get_cart(
         callback.from_user.id
-    )
-
-    if not cart:
+    ):
         await safe_answer_callback(
             callback,
             "Корзина пустая",
@@ -1265,17 +1259,9 @@ async def checkout_name_handler(
         or ""
     ).strip()
 
-    if len(name) < 2:
+    if not 2 <= len(name) <= 60:
         await message.answer(
-            "⚠️ Имя слишком короткое.\n\n"
-            "Напишите имя ещё раз."
-        )
-        return
-
-    if len(name) > 60:
-        await message.answer(
-            "⚠️ Имя слишком длинное.\n\n"
-            "Введите более короткий вариант."
+            "⚠️ Введите корректное имя."
         )
         return
 
@@ -1306,23 +1292,14 @@ async def checkout_phone_handler(
     ).strip()
 
     digits = "".join(
-        character
-        for character in phone
-        if character.isdigit()
+        char
+        for char in phone
+        if char.isdigit()
     )
 
-    if len(digits) < 10:
+    if not 10 <= len(digits) <= 15:
         await message.answer(
-            "⚠️ Номер телефона выглядит "
-            "неполным.\n\n"
-            "Введите его ещё раз."
-        )
-        return
-
-    if len(digits) > 15:
-        await message.answer(
-            "⚠️ В номере слишком много цифр.\n\n"
-            "Введите его ещё раз."
+            "⚠️ Введите корректный номер телефона."
         )
         return
 
@@ -1336,10 +1313,8 @@ async def checkout_phone_handler(
 
     await message.answer(
         "⏰ *Через сколько вы подойдёте?*\n\n"
-        "Например:\n"
-        "• `через 20 минут`\n"
-        "• `через час`\n"
-        "• `в 18:30`"
+        "Например: `через 20 минут` "
+        "или `в 18:30`"
     )
 
 
@@ -1355,16 +1330,9 @@ async def checkout_pickup_handler(
         or ""
     ).strip()
 
-    if len(pickup) < 2:
+    if not 2 <= len(pickup) <= 80:
         await message.answer(
             "⚠️ Укажите время самовывоза."
-        )
-        return
-
-    if len(pickup) > 80:
-        await message.answer(
-            "⚠️ Напишите время короче.\n\n"
-            "Например: `через 30 минут`."
         )
         return
 
@@ -1383,7 +1351,8 @@ async def checkout_pickup_handler(
         "──────────────\n"
         "📋 *Данные для заказа*\n\n"
         f"👤 Имя: *{data['customer_name']}*\n"
-        f"☎️ Телефон: *{data['customer_phone']}*\n"
+        f"☎️ Телефон: "
+        f"*{data['customer_phone']}*\n"
         f"⏰ Самовывоз: *{pickup}*\n\n"
         "Проверьте заказ и нажмите "
         "кнопку подтверждения."
@@ -1414,8 +1383,7 @@ async def order_cancel_callback(
         callback,
         (
             "❌ *Оформление отменено*\n\n"
-            "Товары не удалены и "
-            "остались в корзине."
+            "Товары остались в корзине."
         ),
         cart_keyboard(
             len(cart)
@@ -1426,9 +1394,11 @@ async def order_cancel_callback(
         callback,
         "Оформление отменено",
     )
+
+
 @router.callback_query(
-CheckoutState.waiting_confirmation,
-F.data == "order:confirm",
+    CheckoutState.waiting_confirmation,
+    F.data == "order:confirm",
 )
 async def order_confirm_callback(
     callback: CallbackQuery,
@@ -1436,7 +1406,10 @@ async def order_confirm_callback(
     bot: Bot,
 ) -> None:
     user_id = callback.from_user.id
-    cart = get_cart(user_id)
+
+    cart = get_cart(
+        user_id
+    )
 
     if not cart:
         await safe_answer_callback(
@@ -1448,15 +1421,13 @@ async def order_confirm_callback(
 
     data = await state.get_data()
 
-    required_fields = {
+    required = {
         "customer_name",
         "customer_phone",
         "pickup",
     }
 
-    if not required_fields.issubset(
-        data.keys()
-    ):
+    if not required.issubset(data):
         await state.clear()
 
         await safe_answer_callback(
@@ -1466,7 +1437,9 @@ async def order_confirm_callback(
         )
         return
 
-    total = cart_total(user_id)
+    total = cart_total(
+        user_id
+    )
 
     order_data = {
         "telegram_id": user_id,
@@ -1488,8 +1461,10 @@ async def order_confirm_callback(
     }
 
     try:
-        saved_order = await storage.save_order(
-            order_data
+        saved_order = (
+            await storage.save_order(
+                order_data
+            )
         )
     except Exception:
         logging.exception(
@@ -1543,6 +1518,7 @@ async def order_confirm_callback(
             )
 
     clear_cart(user_id)
+
     await state.clear()
 
     await safe_edit(
@@ -1636,45 +1612,51 @@ async def kitchen_status_callback(
     )
 
     if status == "accept":
-        try:
-            await bot.send_message(
-                customer_id,
-                (
-                    f"👨‍🍳 *Заказ №{order_id} "
-                    "принят в работу!*\n\n"
-                    "Мы начали его готовить."
-                ),
-            )
-        except Exception:
-            logging.exception(
-                "Не удалось уведомить клиента"
-            )
+        text = (
+            f"👨‍🍳 *Заказ №{order_id} "
+            "принят в работу!*\n\n"
+            "Мы начали его готовить."
+        )
 
+        answer = (
+            "Заказ принят в работу"
+        )
+
+    elif status == "ready":
+        text = (
+            f"✅ *Заказ №{order_id} готов!*\n\n"
+            "Можно забирать ❤️"
+        )
+
+        answer = (
+            "Клиент уведомлён ✅"
+        )
+
+    else:
         await safe_answer_callback(
             callback,
-            "Заказ принят в работу",
+            "Неизвестный статус",
+            True,
         )
         return
 
-    if status == "ready":
-        try:
-            await bot.send_message(
-                customer_id,
-                (
-                    f"✅ *Заказ №{order_id} готов!*\n\n"
-                    "Можно забирать ❤️"
-                ),
-            )
-        except Exception:
-            logging.exception(
-                "Не удалось уведомить клиента"
-            )
-
-        await safe_answer_callback(
-            callback,
-            "Клиент уведомлён ✅",
+    try:
+        await bot.send_message(
+            customer_id,
+            text,
         )
-        @router.callback_query(
+    except Exception:
+        logging.exception(
+            "Не удалось уведомить клиента"
+        )
+
+    await safe_answer_callback(
+        callback,
+        answer,
+    )
+
+
+@router.callback_query(
     F.data == "address"
 )
 async def address_callback(
@@ -1728,18 +1710,11 @@ async def privacy_callback(
 ) -> None:
     text = (
         "🔒 *Политика конфиденциальности*\n\n"
-        "Для оформления заказа бот "
-        "может получать следующие данные:\n\n"
-        "• имя\n"
-        "• номер телефона\n"
-        "• Telegram ID\n"
-        "• состав заказа\n"
-        "• время самовывоза\n\n"
-        "Эти данные используются "
-        "только для приёма и выполнения заказа.\n\n"
-        "Информация не используется "
-        "для рекламных рассылок "
-        "и не передаётся посторонним лицам."
+        "Для оформления заказа бот получает "
+        "имя, номер телефона, Telegram ID, "
+        "состав заказа и время самовывоза.\n\n"
+        "Данные используются только "
+        "для обработки и выполнения заказа."
     )
 
     await safe_edit(
@@ -1775,8 +1750,10 @@ async def admin_callback(
 
     await safe_edit(
         callback,
-        "⚙️ *Админ-панель*\n\n"
-        "Выберите раздел:",
+        (
+            "⚙️ *Админ-панель*\n\n"
+            "Выберите раздел:"
+        ),
         admin_keyboard(),
     )
 
