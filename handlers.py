@@ -1884,7 +1884,109 @@ async def admin_stats_callback(
 
     await safe_answer_callback(callback)
 
+@router.message(F.text == "🌯 Меню")
+async def bottom_menu_handler(
+    message: Message,
+    state: FSMContext,
+) -> None:
+    await state.clear()
 
+    await message.answer(
+        "🌯 *Меню*\n\nВыберите категорию:",
+        reply_markup=await categories_keyboard(),
+    )
+
+
+@router.message(F.text == "🛒 Корзина")
+async def bottom_cart_handler(
+    message: Message,
+) -> None:
+    cart = get_cart(
+        message.from_user.id
+    )
+
+    await message.answer(
+        format_cart(
+            message.from_user.id
+        ),
+        reply_markup=cart_keyboard(
+            len(cart)
+        ),
+    )
+
+
+@router.message(F.text == "➕ Добавки")
+async def bottom_extras_handler(
+    message: Message,
+    state: FSMContext,
+) -> None:
+    await state.clear()
+
+    await message.answer(
+        "➕ *Добавки*\n\nЧто хотите добавить?",
+        reply_markup=await extras_keyboard(),
+    )
+
+
+@router.message(F.text == "📍 Адрес")
+async def bottom_address_handler(
+    message: Message,
+) -> None:
+    await message.answer(
+        "📍 *Наш адрес*\n\n"
+        f"{ADDRESS}"
+    )
+
+
+@router.message(F.text == "☎️ Связаться")
+async def bottom_contact_handler(
+    message: Message,
+) -> None:
+    await message.answer(
+        "☎️ *Связаться с нами*\n\n"
+        f"{CONTACT}"
+    )
+
+
+@router.message(
+    F.text.in_(
+        {
+            "🔒 Политика",
+            "🔒 Конфиденциальность",
+        }
+    )
+)
+async def bottom_privacy_handler(
+    message: Message,
+) -> None:
+    await message.answer(
+        "🔒 *Политика конфиденциальности*\n\n"
+        "Для оформления заказа бот получает "
+        "имя, номер телефона, Telegram ID, "
+        "состав заказа и время самовывоза.\n\n"
+        "Данные используются только "
+        "для обработки и выполнения заказа."
+    )
+
+
+@router.message(F.text == "⚙️ Админ-панель")
+async def bottom_admin_handler(
+    message: Message,
+) -> None:
+    if not is_admin(
+        message.from_user.id,
+        ADMIN_IDS,
+    ):
+        await message.answer(
+            "⛔ Доступ запрещён."
+        )
+        return
+
+    await message.answer(
+        "⚙️ *Админ-панель*\n\n"
+        "Выберите раздел:",
+        reply_markup=admin_keyboard(),
+    )
 @router.errors()
 async def error_handler(
     event: ErrorEvent,
